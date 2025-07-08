@@ -32,6 +32,12 @@ class _SessionPageState extends State<SessionPage> {
     });
   }
 
+  String _formatDuration(int seconds) {
+    final minutes = seconds ~/ 60;
+    final secs = seconds % 60;
+    return '${minutes}m ${secs}s';
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -48,12 +54,12 @@ class _SessionPageState extends State<SessionPage> {
               itemCount: sessions.length,
               itemBuilder: (context, index) {
                 final session = sessions[index];
-                final date = session.startTime;
+                final date = session.timestamp;
                 return ListTile(
                   title: Text(session.type),
                   subtitle: Text('${date.day}/${date.month}/${date.year} - '
                       '${date.hour.toString().padLeft(2, '0')}:${date.minute.toString().padLeft(2, '0')}'),
-                  trailing: Text('${(session.duration / 60).round()} min'),
+                  trailing: Text(_formatDuration(session.duration)),
                 );
               },
             ),

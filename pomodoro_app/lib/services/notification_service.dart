@@ -1,33 +1,38 @@
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 
 class NotificationService {
-  static final FlutterLocalNotificationsPlugin _notificationsPlugin =
+  static final FlutterLocalNotificationsPlugin _flutterLocalNotificationsPlugin =
       FlutterLocalNotificationsPlugin();
 
   static Future<void> initialize() async {
-    const android = AndroidInitializationSettings('@mipmap/ic_launcher');
-    const ios = DarwinInitializationSettings();
-    const settings = InitializationSettings(android: android, iOS: ios);
-    await _notificationsPlugin.initialize(settings);
+    const AndroidInitializationSettings initializationSettingsAndroid =
+        AndroidInitializationSettings('@mipmap/ic_launcher');
+
+    const InitializationSettings initializationSettings = InitializationSettings(
+      android: initializationSettingsAndroid,
+    );
+
+    await _flutterLocalNotificationsPlugin.initialize(initializationSettings);
   }
 
   static Future<void> showSessionCompletedNotification() async {
-    const details = NotificationDetails(
-      android: AndroidNotificationDetails(
-        'pomodoro_channel',
-        'Pomodoro Sessions',
-        channelDescription: 'Notification après une session',
-        importance: Importance.max,
-        priority: Priority.high,
-      ),
-      iOS: DarwinNotificationDetails(),
+    const AndroidNotificationDetails androidPlatformChannelSpecifics =
+        AndroidNotificationDetails(
+      'session_channel',
+      'Session Notifications',
+      channelDescription: 'Notifications for Pomodoro sessions',
+      importance: Importance.max,
+      priority: Priority.high,
+      showWhen: false,
     );
+    const NotificationDetails platformChannelSpecifics =
+        NotificationDetails(android: androidPlatformChannelSpecifics);
 
-    await _notificationsPlugin.show(
-      DateTime.now().millisecondsSinceEpoch ~/ 1000,
-      'Session terminée 🎉',
-      'Tu viens de finir une session Pomodoro !',
-      details,
+    await _flutterLocalNotificationsPlugin.show(
+      0,
+      'Session terminée',
+      'Bravo, tu as terminé ta session Pomodoro !',
+      platformChannelSpecifics,
     );
   }
 }

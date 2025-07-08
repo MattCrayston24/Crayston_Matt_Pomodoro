@@ -1,6 +1,7 @@
-// lib/screens/login_screen.dart
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+
+import '../screens/home_page.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -10,134 +11,162 @@ class LoginScreen extends StatefulWidget {
 }
 
 class _LoginScreenState extends State<LoginScreen> {
-  final _emailController = TextEditingController();
-  final _passwordController = TextEditingController();
-  bool _isLoading = false;
-  String? _errorMessage;
+  final SupabaseClient supabase = Supabase.instance.client;
 
-  bool _fieldsAreValid(String email, String password) {
-    if (email.isEmpty || password.isEmpty) {
-      setState(() {
-        _errorMessage = 'Veuillez remplir tous les champs.';
-      });
-      return false;
-    }
-    return true;
-  }
+  final TextEditingController emailController = TextEditingController();
+  final TextEditingController passwordController = TextEditingController();
 
-  Future<void> _signIn() async {
-    final email = _emailController.text.trim();
-    final password = _passwordController.text;
+  bool isLoading = false;
+  String? errorMessage;
 
-    if (!_fieldsAreValid(email, password)) return;
-
+  Future<void> signIn() async {
     setState(() {
-      _isLoading = true;
-      _errorMessage = null;
+      isLoading = true;
+      errorMessage = null;
     });
 
+    final email = emailController.text.trim();
+    final password = passwordController.text.trim();
+
     try {
-      final response = await Supabase.instance.client.auth.signInWithPassword(
+      final response = await supabase.auth.signInWithPassword(
         email: email,
         password: password,
       );
 
-      if (response.session == null) {
-        setState(() {
-          _errorMessage = 'Connexion échouée. Vérifie ton email ou mot de passe.';
-        });
-      }
-    } catch (e) {
-      setState(() {
-        _errorMessage = 'Erreur : ${e.toString()}';
-      });
-    }
-
-    setState(() {
-      _isLoading = false;
-    });
-  }
-
-  Future<void> _signUp() async {
-    final email = _emailController.text.trim();
-    final password = _passwordController.text;
-
-    if (!_fieldsAreValid(email, password)) return;
-
-    setState(() {
-      _isLoading = true;
-      _errorMessage = null;
-    });
-
-    try {
-      final response = await Supabase.instance.client.auth.signUp(
-        email: email,
-        password: password,
-      );
-
-      if (response.user == null) {
-        setState(() {
-          _errorMessage = 'Création de compte échouée.';
-        });
+      if (response.user != null) {
+        if (mounted) {
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(builder: (_) => const HomePage()),
+          );
+        }
       } else {
         setState(() {
-          _errorMessage = 'Compte créé ! Vérifie tes emails pour confirmer.';
+          errorMessage = 'Connexion échouée. Vérifie tes identifiants.';
         });
       }
     } catch (e) {
       setState(() {
-        _errorMessage = 'Erreur : ${e.toString()}';
+        errorMessage = 'Erreur: $e';
       });
+    } finally {
+      if (mounted) {
+        setState(() {
+          isLoading = false;
+        });
+      }
     }
+  }
 
+  Future<void> signUp() async {
     setState(() {
-      _isLoading = false;
+      isLoading = true;
+      errorMessage = null;
     });
+
+    final email = emailController.text.trim();
+    final password = passwordController.text.trim();
+
+    try {
+      final response = await supabase.auth.signUp(email: email, password: password);
+
+      if (response.user != null) {
+        // Inscription réussie, redirige vers la page Home ou montre message
+        if (mounted) {
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(builder: (_) => const HomePage()),
+          );
+        }
+      } else {
+        setState(() {
+          errorMessage = 'Inscription échouée.';
+        });
+      }
+    } catch (e) {
+      setState(() {
+        errorMessage = 'Erreur: $e';
+      });
+    } finally {
+      if (mounted) {
+        setState(() {
+          isLoading = false;
+        });
+      }
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: Colors.grey.shade900,
       body: Center(
-        child: SizedBox(
-          width: 350,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Text(
-                'Connexion',
-                style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
-              ),
-              const SizedBox(height: 24),
-              TextField(
-                controller: _emailController,
-                decoration: const InputDecoration(labelText: 'Email'),
-              ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: _passwordController,
-                decoration: const InputDecoration(labelText: 'Mot de passe'),
-                obscureText: true,
-              ),
-              const SizedBox(height: 24),
-              if (_errorMessage != null)
-                Text(
-                  _errorMessage!,
-                  style: const TextStyle(color: Colors.red),
+        child: Container(
+          constraints: const BoxConstraints(maxWidth: 400),
+          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
+          decoration: BoxDecoration(
+            color: Colors.grey.shade800,
+            borderRadius: BorderRadius.circular(16),
+          ),
+          child: SingleChildScrollView(
+            child: Column(
+              children: [
+                const Text(
+                  'Connexion Pomodoro',
+                  style: TextStyle(
+                    fontSize: 28,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.orange,
+                  ),
                 ),
-              const SizedBox(height: 12),
-              ElevatedButton(
-                onPressed: _isLoading ? null : _signIn,
-                child: _isLoading
-                    ? const CircularProgressIndicator()
-                    : const Text('Se connecter'),
-              ),
-              const SizedBox(height: 12),
-              TextButton(
-                onPressed: _isLoading ? null : _signUp,
-                child: const Text("Créer un compte"),
-              ),
-            ],
+                const SizedBox(height: 24),
+                TextField(
+                  controller: emailController,
+                  decoration: const InputDecoration(
+                    labelText: 'Email',
+                    prefixIcon: Icon(Icons.email),
+                  ),
+                  keyboardType: TextInputType.emailAddress,
+                  autofillHints: const [AutofillHints.email],
+                ),
+                const SizedBox(height: 16),
+                TextField(
+                  controller: passwordController,
+                  decoration: const InputDecoration(
+                    labelText: 'Mot de passe',
+                    prefixIcon: Icon(Icons.lock),
+                  ),
+                  obscureText: true,
+                  autofillHints: const [AutofillHints.password],
+                ),
+                if (errorMessage != null) ...[
+                  const SizedBox(height: 12),
+                  Text(
+                    errorMessage!,
+                    style: const TextStyle(color: Colors.redAccent),
+                  ),
+                ],
+                const SizedBox(height: 24),
+                ElevatedButton(
+                  onPressed: isLoading ? null : signIn,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.orange.shade600,
+                    minimumSize: const Size.fromHeight(40),
+                  ),
+                  child: isLoading
+                      ? const CircularProgressIndicator(
+                          color: Colors.white,
+                        )
+                      : const Text('Se connecter'),
+                ),
+                const SizedBox(height: 12),
+                TextButton(
+                  onPressed: isLoading ? null : signUp,
+                  child: const Text('Créer un compte'),
+                ),
+              ],
+            ),
           ),
         ),
       ),

@@ -1,27 +1,24 @@
 class SessionModel {
   final int? id;
   final String userId;
-  final DateTime startTime;
-  final DateTime endTime;
-  final int duration; // en secondes
   final String type;
+  final int duration; // durée en secondes
+  final DateTime timestamp;
 
   SessionModel({
     this.id,
     required this.userId,
-    required this.startTime,
-    required this.endTime,
-    required this.duration,
     required this.type,
+    required this.duration,
+    required this.timestamp,
   });
 
   Map<String, dynamic> toMap() {
     return {
       'user_id': userId,
-      'start_time': startTime.toIso8601String(),
-      'end_time': endTime.toIso8601String(),
-      'duration': duration,
       'type': type,
+      'duration': duration,
+      'timestamp': timestamp.toIso8601String(),
     };
   }
 
@@ -29,10 +26,9 @@ class SessionModel {
     return SessionModel(
       id: map['id'] as int?,
       userId: map['user_id'],
-      startTime: DateTime.parse(map['start_time']),
-      endTime: DateTime.parse(map['end_time']),
-      duration: map['duration'],
       type: map['type'],
+      duration: map['duration'],
+      timestamp: DateTime.parse(map['timestamp']),
     );
   }
 }

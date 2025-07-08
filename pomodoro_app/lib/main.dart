@@ -13,6 +13,8 @@ void main() async {
     url: 'https://yikjhtzveczynnmlofdr.supabase.co',
     anonKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inlpa2podHp2ZWN6eW5ubWxvZmRyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTE1MjQ2MDcsImV4cCI6MjA2NzEwMDYwN30.a3ScUWIX5pseVrXtbPllQ0hvVpWM9ZGDCv0ROHJ1dFE',
   );
+
+  // Optional: Comment out this line if you want to keep user logged in across app restarts
   await Supabase.instance.client.auth.signOut();
 
   if (Platform.isWindows || Platform.isLinux || Platform.isMacOS) {
