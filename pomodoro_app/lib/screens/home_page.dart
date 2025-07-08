@@ -4,6 +4,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../services/supabase_service.dart';
 import '../auth/login_screen.dart';
 import '../services/notification_service.dart';
+import '../pages/session_page.dart'; // 👈 import ajouté
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -55,6 +56,7 @@ class _HomePageState extends State<HomePage> {
       'type': 'Pomodoro',
       'duration': defaultWorkDuration,
       'start_time': sessionStartTime?.toIso8601String(),
+      'end_time': DateTime.now().toIso8601String(),
       'user_id': supabase.auth.currentUser!.id,
     };
     await _supabaseService.saveSession(session);
@@ -100,6 +102,16 @@ class _HomePageState extends State<HomePage> {
             ElevatedButton(
               onPressed: isRunning ? resetTimer : startTimer,
               child: Text(isRunning ? "Reset (compte comme terminé)" : "Démarrer"),
+            ),
+            const SizedBox(height: 20),
+            ElevatedButton(
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const SessionPage()),
+                );
+              },
+              child: const Text('Voir mes sessions'),
             ),
           ],
         ),

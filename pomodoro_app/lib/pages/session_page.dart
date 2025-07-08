@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../services/supabase_service.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import '../models/session_model.dart';
 
 class SessionPage extends StatefulWidget {
   const SessionPage({super.key});
@@ -13,7 +14,7 @@ class _SessionPageState extends State<SessionPage> {
   final SupabaseService _supabaseService = SupabaseService();
   final SupabaseClient supabase = Supabase.instance.client;
 
-  List<Map<String, dynamic>> sessions = [];
+  List<SessionModel> sessions = [];
 
   @override
   void initState() {
@@ -27,26 +28,35 @@ class _SessionPageState extends State<SessionPage> {
 
     final result = await _supabaseService.fetchUserSessions(user.id);
     setState(() {
-      sessions = result;
+      sessions = result.map((data) => SessionModel.fromMap(data)).toList();
     });
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Historique des sessions')),
-      body: ListView.builder(
-        itemCount: sessions.length,
-        itemBuilder: (context, index) {
-          final session = sessions[index];
-          final date = DateTime.parse(session['start_time']);
-          return ListTile(
-            title: Text(session['type']),
-            subtitle: Text('${date.day}/${date.month}/${date.year} - ${date.hour}:${date.minute.toString().padLeft(2, '0')}'),
-            trailing: Text('${(session['duration'] / 60).round()} min'),
-          );
-        },
+      appBar: AppBar(
+        title: const Text('Historique des sessions'),
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () => Navigator.pop(context),
+        ),
       ),
+      body: sessions.isEmpty
+          ? const Center(child: CircularProgressIndicator())
+          : ListView.builder(
+              itemCount: sessions.length,
+              itemBuilder: (context, index) {
+                final session = sessions[index];
+                final date = session.startTime;
+                return ListTile(
+                  title: Text(session.type),
+                  subtitle: Text('${date.day}/${date.month}/${date.year} - '
+                      '${date.hour.toString().padLeft(2, '0')}:${date.minute.toString().padLeft(2, '0')}'),
+                  trailing: Text('${(session.duration / 60).round()} min'),
+                );
+              },
+            ),
     );
   }
 }
