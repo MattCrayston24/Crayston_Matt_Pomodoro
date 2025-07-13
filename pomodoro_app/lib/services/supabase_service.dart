@@ -25,7 +25,6 @@ class SupabaseService {
           .order('timestamp', ascending: false)
           .execute();
 
-      // Si response.data n'est pas une liste, retourne vide
       if (response.data is List) {
         return List<Map<String, dynamic>>.from(response.data);
       } else {
@@ -33,6 +32,31 @@ class SupabaseService {
       }
     } catch (e) {
       throw Exception('Erreur lors du chargement des sessions : $e');
+    }
+  }
+
+  // Met à jour la dernière session incomplète (non terminée) d’un utilisateur
+  Future<void> updateLastIncompleteSession(String userId, Map<String, dynamic> updatedData) async {
+    try {
+      final response = await _supabase
+          .from('session_historique')
+          .select('id')
+          .eq('user_id', userId)
+          .eq('completed', false)
+          .order('timestamp', ascending: false)
+          .limit(1)
+          .execute();
+
+      if (response.data != null && response.data.isNotEmpty) {
+        final lastSessionId = response.data[0]['id'];
+        await _supabase
+            .from('session_historique')
+            .update(updatedData)
+            .eq('id', lastSessionId)
+            .execute();
+      }
+    } catch (e) {
+      throw Exception('Erreur lors de la mise à jour de la session : $e');
     }
   }
 }

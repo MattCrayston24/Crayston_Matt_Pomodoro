@@ -34,6 +34,7 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
   Timer? _timer;
   bool isRunning = false;
   bool isPaused = false;
+  bool sessionSaved = false;
   DateTime? sessionStartTime;
 
   late AnimationController _animationController;
@@ -48,7 +49,7 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
       vsync: this,
       duration: Duration(seconds: totalTime),
     );
-    _animationController.value = 1.0; // Barre pleine au démarrage
+    _animationController.value = 1.0;
   }
 
   @override
@@ -62,6 +63,7 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
     setState(() {
       isRunning = true;
       isPaused = false;
+      sessionSaved = false;
       sessionStartTime = DateTime.now();
       totalTime = durations[currentSessionType]!;
       remainingTime = totalTime;
@@ -70,15 +72,21 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
     _animationController.duration = Duration(seconds: totalTime);
     _animationController.reverse(from: 1.0);
 
-    _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
+    _timer = Timer.periodic(const Duration(seconds: 1), (timer) async {
       if (remainingTime > 0 && !isPaused) {
         setState(() {
           remainingTime--;
         });
-      } else if (remainingTime == 0) {
+      } else if (remainingTime == 0 && !sessionSaved) {
         timer.cancel();
         _animationController.stop();
-        _completeSession();
+        await _completeSession();
+        setState(() {
+          isRunning = false;
+          isPaused = false;
+          sessionStartTime = null;
+          sessionSaved = true;
+        });
       }
     });
   }
@@ -96,22 +104,6 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
     });
     _animationController.reverse(from: _animationController.value);
   }
-
-void resetTimer() async {
-  _timer?.cancel();            // Stoppe le timer
-  _animationController.stop(); // Arrête l’animation en cours
-  _animationController.value = 1.0; // Remet la barre à pleine longueur
-
-  // On ne sauvegarde pas la session ici, on veut juste reset immédiat
-
-  setState(() {
-    remainingTime = durations[currentSessionType]!; // Remet le compteur à la valeur initiale
-    totalTime = durations[currentSessionType]!;
-    isRunning = false;  // Le timer est arrêté
-    isPaused = false;
-    sessionStartTime = null;
-  });
-}
 
   int _elapsedSessionTime() {
     if (sessionStartTime == null) return 0;
@@ -143,6 +135,7 @@ void resetTimer() async {
       remainingTime = totalTime;
       isRunning = false;
       isPaused = false;
+      sessionSaved = false;
       sessionStartTime = null;
     });
     _animationController.duration = Duration(seconds: totalTime);
@@ -185,7 +178,7 @@ void resetTimer() async {
 
   @override
   Widget build(BuildContext context) {
-    final buttonWidth = 180.0;
+    const buttonWidth = 180.0;
 
     return Scaffold(
       appBar: AppBar(
@@ -249,7 +242,6 @@ void resetTimer() async {
               ),
               const SizedBox(height: 20),
 
-              // Boutons démarrer/pause/reprendre
               if (!isRunning)
                 ElevatedButton(
                   onPressed: startTimer,
@@ -295,9 +287,12 @@ void resetTimer() async {
 
               const SizedBox(height: 10),
 
-              if (isRunning)
+              if (isRunning || isPaused)
                 ElevatedButton(
-                  onPressed: resetTimer,
+                  onPressed: () {
+                    // On bascule vers la pause courte plutôt que de reset
+                    changeSession(SessionType.shortBreak);
+                  },
                   style: ElevatedButton.styleFrom(
                     minimumSize: Size(buttonWidth, 38),
                     backgroundColor: Colors.red.shade600,
@@ -305,14 +300,13 @@ void resetTimer() async {
                     elevation: 4,
                   ),
                   child: const Text(
-                    "Reset",
+                    "Reset (Pause courte)",
                     style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
                   ),
                 ),
 
               const SizedBox(height: 30),
 
-              // Boutons pour changer le mode - texte plus petit
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 12),
                 child: Row(
@@ -354,9 +348,11 @@ void resetTimer() async {
               ElevatedButton(
                 onPressed: goToHistory,
                 style: ElevatedButton.styleFrom(
-                  minimumSize: Size(buttonWidth, 40),
                   backgroundColor: orangeColor,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  padding: const EdgeInsets.symmetric(horizontal: 25, vertical: 12),
                   elevation: 5,
                 ),
                 child: const Text(

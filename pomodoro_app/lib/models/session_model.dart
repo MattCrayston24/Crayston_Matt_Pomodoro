@@ -1,34 +1,29 @@
 class SessionModel {
-  final int? id;
-  final String userId;
-  final String type;
-  final int duration; // durée en secondes
-  final DateTime timestamp;
+  final String type;       // Exemple : "Pomodoro", "Pause courte", "Pause longue"
+  final int duration;      // Durée de la session en minutes
+  final DateTime timestamp; // Horodatage de la session
 
   SessionModel({
-    this.id,
-    required this.userId,
     required this.type,
     required this.duration,
     required this.timestamp,
   });
 
-  Map<String, dynamic> toMap() {
-    return {
-      'user_id': userId,
-      'type': type,
-      'duration': duration,
-      'timestamp': timestamp.toIso8601String(),
-    };
-  }
-
+  // Création d’un objet à partir d’une Map (ex: depuis la base de données)
   factory SessionModel.fromMap(Map<String, dynamic> map) {
     return SessionModel(
-      id: map['id'] as int?,
-      userId: map['user_id'],
-      type: map['type'],
-      duration: map['duration'],
+      type: map['type'] ?? 'Pomodoro', 
+      duration: map['duration'] ?? 0,
       timestamp: DateTime.parse(map['timestamp']),
     );
+  }
+
+  Map<String, dynamic> toMap(String userId) {
+    return {
+      'type': type,                  
+      'duration': duration,
+      'timestamp': timestamp.toIso8601String(),
+      'user_id': userId,
+    };
   }
 }
