@@ -20,29 +20,38 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
   final SupabaseClient supabase = Supabase.instance.client;
   final SupabaseService _supabaseService = SupabaseService();
 
-  static const Map<SessionType, int> durations = {
-    SessionType.pomodoro: 25 * 60,
-    SessionType.shortBreak: 5 * 60,
-    SessionType.longBreak: 15 * 60,
+  static const Map<SessionType, int> defaultDurations = {
+    SessionType.pomodoro: 25,
+    SessionType.shortBreak: 5,
+    SessionType.longBreak: 15,
   };
 
   static const Color orangeColor = Color(0xFFFF6D00);
 
   SessionType currentSessionType = SessionType.pomodoro;
-  late int remainingTime;
-  late int totalTime;
+
+  // Durée personnalisée en minutes, initialisée aux valeurs par défaut
+  Map<SessionType, double> customDurations = {
+    SessionType.pomodoro: 25,
+    SessionType.shortBreak: 5,
+    SessionType.longBreak: 15,
+  };
+
+  late int remainingTime; // en secondes
+  late int totalTime; // en secondes
   Timer? _timer;
   bool isRunning = false;
   bool isPaused = false;
-  bool sessionSaved = false;
   DateTime? sessionStartTime;
 
   late AnimationController _animationController;
 
+  bool isDarkTheme = false;
+
   @override
   void initState() {
     super.initState();
-    totalTime = durations[currentSessionType]!;
+    totalTime = (customDurations[currentSessionType]! * 60).toInt();
     remainingTime = totalTime;
 
     _animationController = AnimationController(
@@ -63,35 +72,35 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
     setState(() {
       isRunning = true;
       isPaused = false;
-      sessionSaved = false;
       sessionStartTime = DateTime.now();
-      totalTime = durations[currentSessionType]!;
+      totalTime = (customDurations[currentSessionType]! * 60).toInt();
       remainingTime = totalTime;
     });
 
     _animationController.duration = Duration(seconds: totalTime);
     _animationController.reverse(from: 1.0);
 
-    _timer = Timer.periodic(const Duration(seconds: 1), (timer) async {
+    _timer?.cancel();
+    _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
       if (remainingTime > 0 && !isPaused) {
         setState(() {
           remainingTime--;
         });
-      } else if (remainingTime == 0 && !sessionSaved) {
+      } else if (remainingTime == 0) {
         timer.cancel();
         _animationController.stop();
-        await _completeSession();
+        _completeSession();
         setState(() {
           isRunning = false;
           isPaused = false;
           sessionStartTime = null;
-          sessionSaved = true;
         });
       }
     });
   }
 
   void pauseTimer() {
+    if (!isRunning || isPaused) return;
     setState(() {
       isPaused = true;
     });
@@ -99,10 +108,30 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
   }
 
   void resumeTimer() {
+    if (!isRunning || !isPaused) return;
     setState(() {
       isPaused = false;
     });
     _animationController.reverse(from: _animationController.value);
+  }
+
+  Future<void> resetTimer() async {
+    _timer?.cancel();
+    _animationController.stop();
+
+    if (isRunning || isPaused) {
+      await _completeSession();
+    }
+
+    setState(() {
+      isRunning = false;
+      isPaused = false;
+      totalTime = (customDurations[currentSessionType]! * 60).toInt();
+      remainingTime = totalTime;
+      sessionStartTime = null;
+      _animationController.value = 1.0;
+      _animationController.duration = Duration(seconds: totalTime);
+    });
   }
 
   int _elapsedSessionTime() {
@@ -131,11 +160,10 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
     _animationController.reset();
     setState(() {
       currentSessionType = type;
-      totalTime = durations[type]!;
+      totalTime = (customDurations[type]! * 60).toInt();
       remainingTime = totalTime;
       isRunning = false;
       isPaused = false;
-      sessionSaved = false;
       sessionStartTime = null;
     });
     _animationController.duration = Duration(seconds: totalTime);
@@ -178,189 +206,254 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
 
   @override
   Widget build(BuildContext context) {
-    const buttonWidth = 180.0;
+    final buttonWidth = 180.0;
 
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(
-          "⏱ ${_getSessionLabel(currentSessionType)}",
-          style: const TextStyle(fontSize: 18),
-        ),
-        backgroundColor: orangeColor,
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.logout),
-            onPressed: logout,
-            tooltip: 'Déconnexion',
-          ),
-        ],
-      ),
-      backgroundColor: const Color(0xFF292C3A),
-      body: Center(
-        child: SingleChildScrollView(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              SizedBox(
-                width: 150,
-                height: 150,
-                child: AnimatedBuilder(
-                  animation: _animationController,
-                  builder: (context, child) {
-                    return Stack(
-                      alignment: Alignment.center,
-                      children: [
-                        SizedBox(
-                          width: 130,
-                          height: 130,
-                          child: CircularProgressIndicator(
-                            value: _animationController.value,
-                            strokeWidth: 10,
-                            color: orangeColor,
-                            backgroundColor: orangeColor.withOpacity(0.3),
-                          ),
-                        ),
-                        Text(
-                          formatDuration(remainingTime),
-                          style: const TextStyle(
-                            fontSize: 36,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.white,
-                            shadows: [
-                              Shadow(
-                                blurRadius: 5,
-                                color: Colors.black54,
-                                offset: Offset(1, 1),
-                              )
-                            ],
-                          ),
-                        ),
-                      ],
-                    );
-                  },
-                ),
+    // Choix du thème
+    final themeData = isDarkTheme
+        ? ThemeData.dark().copyWith(
+            primaryColor: orangeColor,
+            scaffoldBackgroundColor: const Color(0xFF292C3A),
+            elevatedButtonTheme: ElevatedButtonThemeData(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: orangeColor,
               ),
-              const SizedBox(height: 20),
+            ),
+          )
+        : ThemeData.light().copyWith(
+            primaryColor: orangeColor,
+            scaffoldBackgroundColor: Colors.white,
+            elevatedButtonTheme: ElevatedButtonThemeData(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: orangeColor,
+              ),
+            ),
+          );
 
-              if (!isRunning)
-                ElevatedButton(
-                  onPressed: startTimer,
-                  style: ElevatedButton.styleFrom(
-                    minimumSize: Size(buttonWidth, 40),
-                    backgroundColor: orangeColor,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                    elevation: 5,
-                  ),
-                  child: const Text(
-                    "Démarrer",
-                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
-                  ),
-                )
-              else if (isRunning && !isPaused)
-                ElevatedButton(
-                  onPressed: pauseTimer,
-                  style: ElevatedButton.styleFrom(
-                    minimumSize: Size(buttonWidth, 40),
-                    backgroundColor: orangeColor,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                    elevation: 5,
-                  ),
-                  child: const Text(
-                    "Pause",
-                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
-                  ),
-                )
-              else if (isRunning && isPaused)
-                ElevatedButton(
-                  onPressed: resumeTimer,
-                  style: ElevatedButton.styleFrom(
-                    minimumSize: Size(buttonWidth, 40),
-                    backgroundColor: orangeColor,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                    elevation: 5,
-                  ),
-                  child: const Text(
-                    "Reprendre",
-                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
-                  ),
-                ),
-
-              const SizedBox(height: 10),
-
-              if (isRunning || isPaused)
-                ElevatedButton(
-                  onPressed: () {
-                    // On bascule vers la pause courte plutôt que de reset
-                    changeSession(SessionType.shortBreak);
-                  },
-                  style: ElevatedButton.styleFrom(
-                    minimumSize: Size(buttonWidth, 38),
-                    backgroundColor: Colors.red.shade600,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                    elevation: 4,
-                  ),
-                  child: const Text(
-                    "Reset (Pause courte)",
-                    style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
-                  ),
-                ),
-
-              const SizedBox(height: 30),
-
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 12),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: SessionType.values.map((type) {
-                    return Expanded(
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 4),
-                        child: ElevatedButton(
-                          onPressed: () => changeSession(type),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: currentSessionType == type
-                                ? orangeColor
-                                : Colors.grey.shade800,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
+    return Theme(
+      data: themeData,
+      child: Scaffold(
+        appBar: AppBar(
+          title: Text(
+            "⏱ ${_getSessionLabel(currentSessionType)}",
+            style: const TextStyle(fontSize: 18),
+          ),
+          backgroundColor: orangeColor,
+          actions: [
+            IconButton(
+              icon: const Icon(Icons.logout),
+              onPressed: logout,
+              tooltip: 'Déconnexion',
+            ),
+            Switch(
+              value: isDarkTheme,
+              onChanged: (value) {
+                setState(() {
+                  isDarkTheme = value;
+                });
+              },
+              activeColor: Colors.white,
+              inactiveThumbColor: Colors.grey,
+              inactiveTrackColor: Colors.grey.shade400,
+            ),
+          ],
+        ),
+        body: Center(
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                SizedBox(
+                  width: 150,
+                  height: 150,
+                  child: AnimatedBuilder(
+                    animation: _animationController,
+                    builder: (context, child) {
+                      return Stack(
+                        alignment: Alignment.center,
+                        children: [
+                          SizedBox(
+                            width: 130,
+                            height: 130,
+                            child: CircularProgressIndicator(
+                              value: _animationController.value,
+                              strokeWidth: 10,
+                              color: orangeColor,
+                              backgroundColor: orangeColor.withOpacity(0.3),
                             ),
-                            padding: const EdgeInsets.symmetric(vertical: 8),
                           ),
-                          child: Text(
-                            _getSessionLabel(type),
+                          Text(
+                            formatDuration(remainingTime),
                             style: TextStyle(
-                              fontSize: 14,
-                              fontWeight: FontWeight.w500,
-                              color: currentSessionType == type
-                                  ? Colors.white
-                                  : Colors.grey.shade400,
+                              fontSize: 36,
+                              fontWeight: FontWeight.bold,
+                              color: isDarkTheme ? Colors.white : Colors.black,
+                              shadows: const [
+                                Shadow(
+                                  blurRadius: 5,
+                                  color: Colors.black54,
+                                  offset: Offset(1, 1),
+                                )
+                              ],
                             ),
                           ),
+                        ],
+                      );
+                    },
+                  ),
+                ),
+
+                const SizedBox(height: 20),
+
+                // Slider de durée personnalisée (minutes)
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 40),
+                  child: Column(
+                    children: [
+                      Text(
+                        'Durée personnalisée : ${customDurations[currentSessionType]!.toInt()} min',
+                        style: TextStyle(
+                          fontSize: 16,
+                          color: isDarkTheme ? Colors.white : Colors.black87,
+                          fontWeight: FontWeight.w600,
                         ),
                       ),
-                    );
-                  }).toList(),
-                ),
-              ),
-
-              const SizedBox(height: 30),
-
-              ElevatedButton(
-                onPressed: goToHistory,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: orangeColor,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(10),
+                      Slider(
+                        value: customDurations[currentSessionType]!,
+                        min: 0,
+                        max: 60,
+                        divisions: 60,
+                        label: '${customDurations[currentSessionType]!.toInt()} min',
+                        onChanged: (value) {
+                          if (isRunning) return; // Interdit modifier en cours de session
+                          setState(() {
+                            customDurations[currentSessionType] = value;
+                            totalTime = (value * 60).toInt();
+                            remainingTime = totalTime;
+                            _animationController.duration = Duration(seconds: totalTime);
+                            _animationController.value = 1.0;
+                          });
+                        },
+                      ),
+                    ],
                   ),
-                  padding: const EdgeInsets.symmetric(horizontal: 25, vertical: 12),
-                  elevation: 5,
                 ),
-                child: const Text(
-                  "Historique des sessions",
-                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+
+                const SizedBox(height: 10),
+
+                if (!isRunning)
+                  ElevatedButton(
+                    onPressed: startTimer,
+                    style: ElevatedButton.styleFrom(
+                      minimumSize: Size(buttonWidth, 40),
+                      backgroundColor: orangeColor,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                      elevation: 5,
+                    ),
+                    child: const Text(
+                      "Démarrer",
+                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                    ),
+                  )
+                else if (isRunning && !isPaused)
+                  ElevatedButton(
+                    onPressed: pauseTimer,
+                    style: ElevatedButton.styleFrom(
+                      minimumSize: Size(buttonWidth, 40),
+                      backgroundColor: orangeColor,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                      elevation: 5,
+                    ),
+                    child: const Text(
+                      "Pause",
+                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                    ),
+                  )
+                else if (isRunning && isPaused)
+                  ElevatedButton(
+                    onPressed: resumeTimer,
+                    style: ElevatedButton.styleFrom(
+                      minimumSize: Size(buttonWidth, 40),
+                      backgroundColor: orangeColor,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                      elevation: 5,
+                    ),
+                    child: const Text(
+                      "Reprendre",
+                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                    ),
+                  ),
+
+                const SizedBox(height: 10),
+
+                if (isRunning)
+                  ElevatedButton(
+                    onPressed: resetTimer,
+                    style: ElevatedButton.styleFrom(
+                      minimumSize: Size(buttonWidth, 38),
+                      backgroundColor: Colors.red.shade600,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                      elevation: 4,
+                    ),
+                    child: const Text(
+                      "Reset",
+                      style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+                    ),
+                  ),
+
+                const SizedBox(height: 30),
+
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 12),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: SessionType.values.map((type) {
+                      return Expanded(
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 4),
+                          child: ElevatedButton(
+                            onPressed: () {
+                              if (isRunning) return; // interdit changer session en cours
+                              changeSession(type);
+                            },
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: currentSessionType == type
+                                  ? orangeColor
+                                  : (isDarkTheme ? Colors.grey.shade800 : Colors.grey.shade300),
+                              foregroundColor: currentSessionType == type
+                                  ? Colors.white
+                                  : (isDarkTheme ? Colors.white70 : Colors.black87),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                              elevation: currentSessionType == type ? 6 : 0,
+                              padding: const EdgeInsets.symmetric(vertical: 12),
+                            ),
+                            child: Text(
+                              _getSessionLabel(type),
+                              style: const TextStyle(fontWeight: FontWeight.w700),
+                            ),
+                          ),
+                        ),
+                      );
+                    }).toList(),
+                  ),
                 ),
-              ),
-            ],
+
+                const SizedBox(height: 40),
+
+                ElevatedButton.icon(
+                  onPressed: goToHistory,
+                  icon: const Icon(Icons.history),
+                  label: const Text("Historique"),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: orangeColor,
+                    padding: const EdgeInsets.symmetric(horizontal: 30, vertical: 12),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    elevation: 5,
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ),
